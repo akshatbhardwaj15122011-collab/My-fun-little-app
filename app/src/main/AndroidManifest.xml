@@ -2,6 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Declare attribution tags for system AppOps audit and sensitive platform access -->
+    <attribution
+        android:tag="null"
+        android:label="@string/app_name" />
+
+    <attribution
+        android:tag="attributionTag"
+        android:label="@string/app_name" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
