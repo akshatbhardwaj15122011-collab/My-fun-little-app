@@ -1,0 +1,6 @@
+{
+  "name": "Battery Survivor",
+  "description": "Dodge rogue background apps, clear Chrome tabs, survive RAM monsters, and collect charging particles inside active systems in this chaotic mobile survival game!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
