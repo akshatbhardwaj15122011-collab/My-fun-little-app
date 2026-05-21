@@ -188,7 +188,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         SoundEffects.playPowerUp()
 
         // Core physics update loop (Aiming for ~60hz smooth update)
-        gameLoopJob = viewModelScope.launch(Dispatchers.Default) {
+        gameLoopJob = viewModelScope.launch(Dispatchers.Main) {
             var lastFrameTime = System.nanoTime()
             val scoreAccumulationStep = 1000_000_000L // ns (1 second)
             var lastScoreTick = System.nanoTime()
@@ -344,7 +344,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _powerUps.value = currentPowerUps
 
         // 6. Update Enemy position and AI
-        val speedMultiplier = 1f + (gameTimeElapsed / 90f) // enemies speed up over time
+        val baseSpeedMultiplier = 1f + (gameTimeElapsed / 90f) // enemies speed up over time
+        val speedMultiplier = if (_batterySaverActive.value) baseSpeedMultiplier * 0.5f else baseSpeedMultiplier
         val currentEnemies = _enemies.value.map { enemy ->
             var newX = enemy.x + enemy.vx * speedMultiplier * delta
             var newY = enemy.y + enemy.vy * speedMultiplier * delta
@@ -566,12 +567,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val playerRadius = 35f // collision bubble for player battery
 
         // 1. Collisions with particles
-        val workingParticles = _particles.value
-        for (part in workingParticles) {
-            if (part.isCollected) continue
-            val dist = hypot(px - part.x, py - part.y)
-            if (dist < playerRadius + part.size / 2) {
-                part.isCollected = true
+        var particlesChanged = false
+        val updatedParticles = _particles.value.map { part ->
+            if (!part.isCollected && hypot(px - part.x, py - part.y) < playerRadius + part.size / 2) {
+                particlesChanged = true
                 _particlesCollected.value += 1
                 
                 // Add battery charge
@@ -581,29 +580,43 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 
                 triggerVisualEffect(part.x, part.y, Color(0xFF00FF66), "impact_particle", "+10% Charge")
                 SoundEffects.playBeep()
+                part.copy(isCollected = true)
+            } else {
+                part
             }
+        }
+        if (particlesChanged) {
+            _particles.value = updatedParticles
         }
 
         // 2. Collisions with Power-Ups
-        val workingPowerUps = _powerUps.value
-        for (pw in workingPowerUps) {
-            if (pw.isCollected) continue
-            val dist = hypot(px - pw.x, py - pw.y)
-            if (dist < playerRadius + pw.size / 2) {
-                pw.isCollected = true
+        var powerUpsChanged = false
+        val updatedPowerUps = _powerUps.value.map { pw ->
+            if (!pw.isCollected && hypot(px - pw.x, py - pw.y) < playerRadius + pw.size / 2) {
+                powerUpsChanged = true
                 activatePowerUpEffect(pw.type)
+                pw.copy(isCollected = true)
+            } else {
+                pw
             }
+        }
+        if (powerUpsChanged) {
+            _powerUps.value = updatedPowerUps
         }
 
         // 3. Collisions with Enemies
-        val workingEnemies = _enemies.value
-        for (enemy in workingEnemies) {
-            if (enemy.isDestroyed) continue
-            val dist = hypot(px - enemy.x, py - enemy.y)
-            if (dist < playerRadius + enemy.size * 0.42f) {
-                enemy.isDestroyed = true
+        var enemiesChanged = false
+        val updatedEnemies = _enemies.value.map { enemy ->
+            if (!enemy.isDestroyed && hypot(px - enemy.x, py - enemy.y) < playerRadius + enemy.size * 0.42f) {
+                enemiesChanged = true
                 handlePlayerHit(enemy)
+                enemy.copy(isDestroyed = true)
+            } else {
+                enemy
             }
+        }
+        if (enemiesChanged) {
+            _enemies.value = updatedEnemies
         }
     }
 
@@ -925,7 +938,7 @@ data class Enemy(
     val vy: Float,
     val size: Float,
     val text: String,
-    var isDestroyed: Boolean = false
+    val isDestroyed: Boolean = false
 )
 
 data class Particle(
@@ -933,7 +946,7 @@ data class Particle(
     val x: Float,
     val y: Float,
     val size: Float = 24f,
-    var isCollected: Boolean = false
+    val isCollected: Boolean = false
 )
 
 data class PowerUp(
@@ -942,7 +955,7 @@ data class PowerUp(
     val x: Float,
     val y: Float,
     val size: Float = 55f,
-    var isCollected: Boolean = false
+    val isCollected: Boolean = false
 )
 
 data class VisualEffect(

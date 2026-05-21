@@ -15,6 +15,7 @@ object SoundEffects {
         }
     }
 
+    @Synchronized
     fun playBeep() {
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
@@ -23,6 +24,7 @@ object SoundEffects {
         }
     }
 
+    @Synchronized
     fun playExplosion() {
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 200)
@@ -31,6 +33,7 @@ object SoundEffects {
         }
     }
 
+    @Synchronized
     fun playPowerUp() {
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_SUP_PIP, 150)
@@ -39,6 +42,7 @@ object SoundEffects {
         }
     }
 
+    @Synchronized
     fun playWarning() {
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_SUP_CONGESTION, 250)
@@ -47,6 +51,7 @@ object SoundEffects {
         }
     }
 
+    @Synchronized
     fun playHit() {
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_PROMPT, 100)
@@ -55,6 +60,7 @@ object SoundEffects {
         }
     }
 
+    @Synchronized
     fun playEmp() {
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_SUP_RADIO_ACK, 300)
