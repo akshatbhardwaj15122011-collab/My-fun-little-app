@@ -1,0 +1,42 @@
+name: Build & Publish Release APK
+
+on:
+  push:
+    tags:
+      - 'v*' # This tells GitHub to run only when you tag your code like v1.0, v1.1, etc.
+
+jobs:
+  build:
+    name: Compile APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # This gives GitHub permission to upload your file to the Releases tab
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant Execute Permission to Gradle
+        run: chmod +x gradlew
+
+      - name: Build Release Unsigned APK
+        run: ./gradlew assembleRelease
+
+      # This automatically moves the generated binary file out with a clean name
+      - name: Rename APK Asset
+        run: mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/BatterySurvivor-Release.apk
+
+      - name: Create & Publish GitHub Release Page
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/BatterySurvivor-Release.apk
+          generate_release_notes: true # This automatically logs your commit changes onto the release page
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
