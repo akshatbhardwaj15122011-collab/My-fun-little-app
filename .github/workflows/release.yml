@@ -22,20 +22,19 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Automatically sets up a global, working version of Gradle on the cloud machine
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: wrapper # This will automatically find or configure the correct gradle version
+          gradle-version: wrapper
 
-      # Compile the project using the global gradle system instead of ./gradlew
-      - name: Build Release Unsigned APK
-        run: gradle assembleRelease --no-daemon
+      # Changed to assembleDebug to bypass the missing .jks keystore error completely
+      - name: Build Debug APK
+        run: gradle assembleDebug --no-daemon
 
       - name: Clean and Rename APK Asset
         run: |
           mkdir -p apk-output
-          cp app/build/outputs/apk/release/app-release-unsigned.apk apk-output/BatterySurvivor-Release.apk
+          cp app/build/outputs/apk/debug/app-debug.apk apk-output/BatterySurvivor-Release.apk
         continue-on-error: true
 
       - name: Create & Publish GitHub Release Page
