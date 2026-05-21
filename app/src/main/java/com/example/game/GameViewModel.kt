@@ -312,34 +312,33 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val isMagnet = _magnetActive.value
 
         val currentParticles = _particles.value.map { particle ->
-            if (particle.isCollected) return@map particle
-            
-            var newX = particle.x
-            var newY = particle.y
-
-            // Magnet powerup pulls particles in
-            if (isMagnet) {
+            if (particle.isCollected) {
+                particle
+            } else {
                 val dx = px - particle.x
                 val dy = py - particle.y
                 val dist = sqrt(dx * dx + dy * dy)
-                if (dist < 450f) {
-                    val magSpeed = 380f // pull speed
-                    newX += (dx / dist) * magSpeed * delta
-                    newY += (dy / dist) * magSpeed * delta
+                val pull = if (isMagnet && dist < 450f) {
+                    val magSpeed = 380f
+                    Pair((dx / dist) * magSpeed * delta, (dy / dist) * magSpeed * delta)
+                } else {
+                    Pair(0f, 0f)
                 }
+                particle.copy(
+                    x = particle.x + pull.first,
+                    y = particle.y + pull.second + (45f * delta)
+                )
             }
-
-            // floating dynamic movement
-            newY += 45f * delta // drift down slightly like cascading charging current
-
-            particle.copy(x = newX, y = newY)
         }.filter { it.y < canvasHeight + 100f && !it.isCollected }
         _particles.value = currentParticles
 
         // 5. Update Power-Up positions
         val currentPowerUps = _powerUps.value.map { pUp ->
-            if (pUp.isCollected) return@map pUp
-            pUp.copy(y = pUp.y + 70f * delta) // drift down
+            if (pUp.isCollected) {
+                pUp
+            } else {
+                pUp.copy(y = pUp.y + 70f * delta)
+            }
         }.filter { it.y < canvasHeight + 100f && !it.isCollected }
         _powerUps.value = currentPowerUps
 
@@ -347,54 +346,53 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val baseSpeedMultiplier = 1f + (gameTimeElapsed / 90f) // enemies speed up over time
         val speedMultiplier = if (_batterySaverActive.value) baseSpeedMultiplier * 0.5f else baseSpeedMultiplier
         val currentEnemies = _enemies.value.map { enemy ->
-            var newX = enemy.x + enemy.vx * speedMultiplier * delta
-            var newY = enemy.y + enemy.vy * speedMultiplier * delta
-            var newVx = enemy.vx
-            var newVy = enemy.vy
-
-            // AI details per enemy types
-            when (enemy.type) {
+            val stepX = enemy.x + enemy.vx * speedMultiplier * delta
+            val stepY = enemy.y + enemy.vy * speedMultiplier * delta
+            
+            val (nextVx, nextVy) = when (enemy.type) {
                 EnemyType.CHROME_TAB -> {
-                    // Chrome tabs float and occasionally lock on the player's direction
                     if (Random.nextFloat() < 0.015f) {
                         val dx = px - enemy.x
                         val dy = py - enemy.y
                         val dist = hypot(dx, dy).coerceAtLeast(1f)
-                        newVx = (dx / dist) * 160f
-                        newVy = (dy / dist) * 160f
+                        Pair((dx / dist) * 160f, (dy / dist) * 160f)
+                    } else {
+                        Pair(enemy.vx, enemy.vy)
                     }
                 }
                 EnemyType.NOTIFICATION -> {
-                    // Quick linear projectiles, no direction alterations
+                    Pair(enemy.vx, enemy.vy)
                 }
                 EnemyType.BACKGROUND_APP -> {
-                    // Bounces off visual walls
-                    if (newX < 30f || newX > canvasWidth - 30f) {
-                        newVx = -newVx
-                    }
-                    if (newY < 30f || newY > canvasHeight - 200f) {
-                        newVy = -newVy
-                    }
+                    val flippedVx = if (stepX < 30f || stepX > canvasWidth - 30f) -enemy.vx else enemy.vx
+                    val flippedVy = if (stepY < 30f || stepY > canvasHeight - 200f) -enemy.vy else enemy.vy
+                    Pair(flippedVx, flippedVy)
                 }
                 EnemyType.SOFTWARE_UPDATE -> {
-                    // Heavy orbital path / spiral curving drift
                     val angle = (gameTimeElapsed * 1.5f) % (2 * Math.PI)
-                    newVx = (Math.cos(angle) * 110f).toFloat()
-                    newVy = enemy.vy + 10f * delta
+                    Pair((Math.cos(angle) * 110f).toFloat(), enemy.vy + 10f * delta)
                 }
                 EnemyType.RAM_MONSTER -> {
-                    // Monster slowly crawls directly towards player, vacuuming powerups
                     val dx = px - enemy.x
                     val dy = py - enemy.y
                     val dist = hypot(dx, dy).coerceAtLeast(1f)
-                    newVx = (dx / dist) * 80f
-                    newVy = (dy / dist) * 80f
+                    Pair((dx / dist) * 80f, (dy / dist) * 80f)
                 }
             }
+            
+            val finalX = if (enemy.type == EnemyType.BACKGROUND_APP) {
+                (enemy.x + nextVx * speedMultiplier * delta).coerceIn(30f, canvasWidth - 30f)
+            } else {
+                stepX
+            }
+            val finalY = if (enemy.type == EnemyType.BACKGROUND_APP) {
+                (enemy.y + nextVy * speedMultiplier * delta).coerceIn(30f, canvasHeight - 200f)
+            } else {
+                stepY
+            }
 
-            enemy.copy(x = newX, y = newY, vx = newVx, vy = newVy)
+            enemy.copy(x = finalX, y = finalY, vx = nextVx, vy = nextVy)
         }.filter {
-            // Keep inside active arena + buffers
             it.x in -300f..(canvasWidth + 300f) && it.y in -300f..(canvasHeight + 300f)
         }
         _enemies.value = currentEnemies
@@ -566,26 +564,43 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val py = _playerY.value
         val playerRadius = 35f // collision bubble for player battery
 
+        var collectedCount = 0
+        var batteryBoost = 0f
+        var scoreBoost = 0
+
+        val newVisualEffects = mutableListOf<VisualEffect>()
+
         // 1. Collisions with particles
-        var particlesChanged = false
         val updatedParticles = _particles.value.map { part ->
             if (!part.isCollected && hypot(px - part.x, py - part.y) < playerRadius + part.size / 2) {
-                particlesChanged = true
-                _particlesCollected.value += 1
+                collectedCount++
+                batteryBoost += 10f
+                scoreBoost += 35
                 
-                // Add battery charge
-                val boost = 10f
-                _batteryLevel.value = (_batteryLevel.value + boost).coerceAtLeast(0f).coerceAtMost(100f)
-                _score.value += 35 // points for charging up!
-                
-                triggerVisualEffect(part.x, part.y, Color(0xFF00FF66), "impact_particle", "+10% Charge")
+                val effId = nextEntityId++
+                newVisualEffects.add(
+                    VisualEffect(
+                        id = effId,
+                        x = part.x,
+                        y = part.y,
+                        duration = 1000L,
+                        maxDuration = 1000L,
+                        color = Color(0xFF00FF66),
+                        type = "impact_particle",
+                        text = "+10% Charge"
+                    )
+                )
                 SoundEffects.playBeep()
                 part.copy(isCollected = true)
             } else {
                 part
             }
         }
-        if (particlesChanged) {
+
+        if (collectedCount > 0) {
+            _particlesCollected.value += collectedCount
+            _batteryLevel.value = (_batteryLevel.value + batteryBoost).coerceAtLeast(0f).coerceAtMost(100f)
+            _score.value += scoreBoost
             _particles.value = updatedParticles
         }
 
@@ -617,6 +632,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         if (enemiesChanged) {
             _enemies.value = updatedEnemies
+        }
+
+        if (newVisualEffects.isNotEmpty()) {
+            _visualEffects.value = _visualEffects.value + newVisualEffects
         }
     }
 
@@ -696,12 +715,33 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 val bonus = screenEnemies.size * 20
                 _score.value += bonus
                 
-                triggerVisualEffect(canvasWidth / 2, canvasHeight / 2, Color(0xFF00E5FF), "emp_ring", "EMP DETONATED!")
-                
-                for (en in screenEnemies) {
-                    triggerVisualEffect(en.x, en.y, Color(0xFF00E5FF), "explosion", "+20 PTS")
+                val explosions = screenEnemies.map { en ->
+                    val id = nextEntityId++
+                    VisualEffect(
+                        id = id,
+                        x = en.x,
+                        y = en.y,
+                        duration = 350L,
+                        maxDuration = 350L,
+                        color = Color(0xFF00E5FF),
+                        type = "explosion",
+                        text = "+20 PTS"
+                    )
                 }
                 
+                val empRingId = nextEntityId++
+                val empRing = VisualEffect(
+                    id = empRingId,
+                    x = canvasWidth / 2,
+                    y = canvasHeight / 2,
+                    duration = 600L,
+                    maxDuration = 600L,
+                    color = Color(0xFF00E5FF),
+                    type = "emp_ring",
+                    text = "EMP DETONATED!"
+                )
+                
+                _visualEffects.value = _visualEffects.value + explosions + empRing
                 _enemies.value = emptyList()
                 _screenShake.value = 22f
                 _glitchRate.value = 0.5f
@@ -812,9 +852,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     triggerVisualEffect(canvasWidth / 2, canvasHeight / 2, Color.Green, "cleaner_sweep", "CHROME TERMINATED! RAM CLEANED")
                 } else {
                     // Ignore -> Spawns 4 tabs immediately in extreme speeds
-                    repeat(4) {
+                    val newTabs = (1..4).map {
                         val id = nextEntityId++
-                        val enemy = Enemy(
+                        Enemy(
                             id = id,
                             type = EnemyType.CHROME_TAB,
                             x = Random.nextFloat() * canvasWidth,
@@ -824,8 +864,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             size = 65f,
                             text = "Chrome Tab Overload!"
                         )
-                        _enemies.value = _enemies.value + enemy
                     }
+                    _enemies.value = _enemies.value + newTabs
                     triggerVisualEffect(canvasXToRelative(0.5f), canvasYToRelative(0.5f), Color.Red, "damage", "TABS FLOODING!")
                 }
             }
@@ -889,9 +929,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     triggerVisualEffect(canvasWidth / 2, canvasHeight / 2, Color.Cyan, "shield_block", "SOCIAL SPAM SILENCED")
                 } else {
                     // Allow Spam -> RAPID-FIRE bullet storm!
-                    repeat(8) { idx ->
+                    val bulletList = (0 until 8).map { idx ->
                         val id = nextEntityId++
-                        val bullet = Enemy(
+                        Enemy(
                             id = id,
                             type = EnemyType.NOTIFICATION,
                             x = if (idx % 2 == 0) -40f else canvasWidth + 40f,
@@ -901,8 +941,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             size = 50f,
                             text = "BUY CRYPTO NOW!!"
                         )
-                        _enemies.value = _enemies.value + bullet
                     }
+                    _enemies.value = _enemies.value + bulletList
                 }
             }
         }
@@ -976,3 +1016,4 @@ data class ActivePopupData(
     val btnRight: String,
     val actionId: PopupAction
 )
+
