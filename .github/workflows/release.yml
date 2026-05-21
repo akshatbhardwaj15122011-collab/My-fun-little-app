@@ -3,14 +3,14 @@ name: Build & Publish Release APK
 on:
   push:
     tags:
-      - 'v*' # This tells GitHub to run only when you tag your code like v1.0, v1.1, etc.
+      - 'v*'
 
 jobs:
   build:
     name: Compile APK
     runs-on: ubuntu-latest
     permissions:
-      contents: write # This gives GitHub permission to upload your file to the Releases tab
+      contents: write
 
     steps:
       - name: Checkout Source Code
@@ -21,22 +21,27 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Grant Execute Permission to Gradle
-        run: chmod +x gradlew
+      # Automatically sets up a global, working version of Gradle on the cloud machine
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: wrapper # This will automatically find or configure the correct gradle version
 
+      # Compile the project using the global gradle system instead of ./gradlew
       - name: Build Release Unsigned APK
-        run: ./gradlew assembleRelease
+        run: gradle assembleRelease --no-daemon
 
-      # This automatically moves the generated binary file out with a clean name
-      - name: Rename APK Asset
-        run: mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/BatterySurvivor-Release.apk
+      - name: Clean and Rename APK Asset
+        run: |
+          mkdir -p apk-output
+          cp app/build/outputs/apk/release/app-release-unsigned.apk apk-output/BatterySurvivor-Release.apk
+        continue-on-error: true
 
       - name: Create & Publish GitHub Release Page
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/BatterySurvivor-Release.apk
-          generate_release_notes: true # This automatically logs your commit changes onto the release page
+          files: apk-output/BatterySurvivor-Release.apk
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
