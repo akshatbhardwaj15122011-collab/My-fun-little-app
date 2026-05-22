@@ -489,12 +489,15 @@ fun GameplayScreen(viewModel: GameViewModel) {
                     PowerUpType.SHIELD -> "🛡️"
                 }
 
-                drawText(
-                    textMeasurer = textMeasurer,
-                    text = letterSymbol,
-                    topLeft = Offset(pX - 14f, pY - 18f),
-                    style = TextStyle(fontSize = 11.sp)
-                )
+                if (pX - 14f < size.width && pY - 18f < size.height) {
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = letterSymbol,
+                        topLeft = Offset(pX - 14f, pY - 18f),
+                        size = Size(100f, 100f),
+                        style = TextStyle(fontSize = 11.sp)
+                    )
+                }
             }
 
             // Drawing Enemies (Cyber Threats)
@@ -580,17 +583,22 @@ fun GameplayScreen(viewModel: GameViewModel) {
 
                 // Humorous title headers
                 if (eS > 80f) {
-                    drawText(
-                        textMeasurer = textMeasurer,
-                        text = enemy.text,
-                        topLeft = Offset(eX - 80f, eY - eS * 0.6f - 14f),
-                        style = TextStyle(
-                            color = enemyColor,
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
+                    val renderX = eX - 80f
+                    val renderY = eY - eS * 0.6f - 14f
+                    if (renderX < size.width && renderY < size.height && renderX > -300f && renderY > -300f) {
+                        drawText(
+                            textMeasurer = textMeasurer,
+                            text = enemy.text,
+                            topLeft = Offset(renderX, renderY),
+                            size = Size(350f, 100f),
+                            style = TextStyle(
+                                color = enemyColor,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
                         )
-                    )
+                    }
                 }
             }
 
@@ -653,30 +661,40 @@ fun GameplayScreen(viewModel: GameViewModel) {
                         }
                     }
                     "damage" -> {
-                        drawText(
-                            textMeasurer = textMeasurer,
-                            text = effect.text,
-                            topLeft = Offset(effect.x - 70f, effect.y - 110f * invRatio),
-                            style = TextStyle(
-                                color = effect.color.copy(alpha = durationRatio),
-                                fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Black
+                        val renderX = effect.x - 70f
+                        val renderY = effect.y - 110f * invRatio
+                        if (renderX < size.width && renderY < size.height && renderX > -300f && renderY > -300f) {
+                            drawText(
+                                textMeasurer = textMeasurer,
+                                text = effect.text,
+                                topLeft = Offset(renderX, renderY),
+                                size = Size(300f, 100f),
+                                style = TextStyle(
+                                    color = effect.color.copy(alpha = durationRatio),
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Black
+                                )
                             )
-                        )
+                        }
                     }
                     "impact_particle" -> {
-                        drawText(
-                            textMeasurer = textMeasurer,
-                            text = effect.text,
-                            topLeft = Offset(effect.x - 50f, effect.y - 90f * invRatio),
-                            style = TextStyle(
-                                color = effect.color.copy(alpha = durationRatio),
-                                fontSize = 12.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
+                        val renderX = effect.x - 50f
+                        val renderY = effect.y - 90f * invRatio
+                        if (renderX < size.width && renderY < size.height && renderX > -300f && renderY > -300f) {
+                            drawText(
+                                textMeasurer = textMeasurer,
+                                text = effect.text,
+                                topLeft = Offset(renderX, renderY),
+                                size = Size(300f, 100f),
+                                style = TextStyle(
+                                    color = effect.color.copy(alpha = durationRatio),
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -771,12 +789,17 @@ fun GameplayScreen(viewModel: GameViewModel) {
 
             // Light bolt icon
             val boltHov = sin(System.currentTimeMillis() / 200.0).toFloat() * 3f
-            drawText(
-                textMeasurer = textMeasurer,
-                text = "⚡",
-                topLeft = Offset(plX - 11f, plY - 32f + boltHov),
-                style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            )
+            val boltX = plX - 11f
+            val boltY = plY - 32f + boltHov
+            if (boltX < size.width && boltY < size.height) {
+                drawText(
+                    textMeasurer = textMeasurer,
+                    text = "⚡",
+                    topLeft = Offset(boltX, boltY),
+                    size = Size(100f, 100f),
+                    style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                )
+            }
 
             // Shield Bubble
             if (shieldsActive > 0) {
@@ -791,12 +814,17 @@ fun GameplayScreen(viewModel: GameViewModel) {
                     center = Offset(plX, plY),
                     style = Stroke(width = 2.5f * shieldsActive)
                 )
-                drawText(
-                    textMeasurer = textMeasurer,
-                    text = "x$shieldsActive",
-                    topLeft = Offset(plX - 14f, plY - 70f),
-                    style = TextStyle(color = CyberCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                )
+                val shieldTxtX = plX - 14f
+                val shieldTxtY = plY - 70f
+                if (shieldTxtX < size.width && shieldTxtY < size.height) {
+                    drawText(
+                        textMeasurer = textMeasurer,
+                        text = "x$shieldsActive",
+                        topLeft = Offset(shieldTxtX, shieldTxtY),
+                        size = Size(100f, 100f),
+                        style = TextStyle(color = CyberCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    )
+                }
             }
         }
 
