@@ -1186,7 +1186,10 @@ fun GameplayScreen(viewModel: GameViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.7f))
-                    .pointerInput(Unit) { detectDragGestures { _, _ -> } } // consume all touch events
+                    .pointerInput(Unit) {
+                        detectDragGestures { _, _ -> }
+                    }
+                    .clickable(enabled = true) {} // consume all tap events too
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
