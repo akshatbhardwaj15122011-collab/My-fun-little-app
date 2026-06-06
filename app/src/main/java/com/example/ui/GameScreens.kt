@@ -395,8 +395,8 @@ fun GameplayScreen(viewModel: GameViewModel) {
             var shakeX = 0f
             var shakeY = 0f
             if (screenShakeVal > 0f) {
-                shakeX = (Random.nextFloat() * 2f - 1f) * screenShakeVal * 1.5f
-                shakeY = (Random.nextFloat() * 2f - 1f) * screenShakeVal * 1.5f
+                shakeX = (Random.nextFloat() * 2f - 1f) * screenShakeVal * 0.6f
+                shakeY = (Random.nextFloat() * 2f - 1f) * screenShakeVal * 0.6f
             }
 
             // Background Grid Lines
@@ -610,12 +610,12 @@ fun GameplayScreen(viewModel: GameViewModel) {
             // Draw glitched flickers inside intense shake moments
             if (glitchEffectRate > 0f) {
                 drawRect(
-                    color = CyberGreen.copy(alpha = glitchEffectRate * 0.12f),
+                    color = CyberGreen.copy(alpha = glitchEffectRate * 0.06f),
                     topLeft = Offset(0f, Random.nextFloat() * height),
                     size = Size(width, 16f)
                 )
                 drawRect(
-                    color = CyberPink.copy(alpha = glitchEffectRate * 0.18f),
+                    color = CyberPink.copy(alpha = glitchEffectRate * 0.08f),
                     topLeft = Offset(0f, Random.nextFloat() * height),
                     size = Size(width, 22f)
                 )

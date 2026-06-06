@@ -667,7 +667,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handlePlayerHit(enemy: Enemy) {
         // Trigger impact screen shake and visual warning alert
-        _screenShake.value = 15f
+        _screenShake.value = 7f
         _glitchRate.value = 0.8f
 
         // Check shields
@@ -769,7 +769,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 
                 _visualEffects.value = _visualEffects.value + explosions + empRing
                 _enemies.value = emptyList()
-                _screenShake.value = 22f
+                _screenShake.value = 12f
                 _glitchRate.value = 0.5f
                 SoundEffects.playEmp()
             }
@@ -919,7 +919,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     // Install -> Temporary visual blackouts and heavy visual glitch
                     _glitchRate.value = 1.0f
-                    _screenShake.value = 35f
+                    _screenShake.value = 18f
                     viewModelScope.launch {
                         _glitchRate.value = 0.9f
                         delay(2000L)
