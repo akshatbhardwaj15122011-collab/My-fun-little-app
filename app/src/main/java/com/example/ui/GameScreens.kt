@@ -1187,9 +1187,12 @@ fun GameplayScreen(viewModel: GameViewModel) {
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.7f))
                     .pointerInput(Unit) {
-                        detectDragGestures { _, _ -> }
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent() // consume every single touch event
+                            }
+                        }
                     }
-                    .clickable(enabled = true) {} // consume all tap events too
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
