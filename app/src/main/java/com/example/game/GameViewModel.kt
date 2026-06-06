@@ -100,6 +100,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var isPlaying = false
 
     // Difficulty Scaling Factors
+    // Combo Multiplier system
+    private val _comboMultiplier = MutableStateFlow(1)
+    val comboMultiplier: StateFlow<Int> = _comboMultiplier.asStateFlow()
+    private var lastCollectTime = 0L
+    private val comboWindowMs = 2500L // collect within 2.5s to keep combo
+
     private var gameTimeElapsed = 0f
     private var enemySpawnDelay = 1500L // ms
     private var lastEnemySpawnTime = 0L
@@ -176,12 +182,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _screenShake.value = 0f
         _glitchRate.value = 0f
 
+        _comboMultiplier.value = 1
+        lastCollectTime = 0L
+
         gameTimeElapsed = 0f
-        enemySpawnDelay = 1800 * 1000000L // nanoseconds check, let's use ms system ticks
+        enemySpawnDelay = 1800L // ms - initial spawn delay (scaled dynamically in handleSpawning)
         val startTime = System.currentTimeMillis()
         lastEnemySpawnTime = startTime
         lastParticleSpawnTime = startTime
-        lastPowerUpSpawnTime = startTime + 4000 // give a delay for first power-up
+        lastPowerUpSpawnTime = startTime + 2000 // give a small delay for first power-up
         lastPopupTime = startTime + 10000 // popups start after 10 seconds
 
         isPlaying = true
@@ -208,9 +217,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (now - lastScoreTick >= scoreAccumulationStep) {
                     _secondsSurvived.value += 1
                     // natural battery consumption
-                    val drainBase = if (_batterySaverActive.value) 1.2f else 2.5f
+                    val drainBase = if (_batterySaverActive.value) 0.8f else 1.8f
                     // difficulty scaling: battery drains faster over time
-                    val decayScaling = 1f + (gameTimeElapsed / 80f)
+                    val decayScaling = 1f + (gameTimeElapsed / 120f)  // slower ramp
                     val totalDrain = drainBase * decayScaling
                     
                     val curLevel = _batteryLevel.value
@@ -228,7 +237,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     // Score accumulation from pure survival
-                    val pointGain = if (_batterySaverActive.value) 5 else 10
+                    val pointGain = if (_batterySaverActive.value) 8 else 15
                     _score.value += pointGain
                     
                     lastScoreTick = now
@@ -343,15 +352,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _powerUps.value = currentPowerUps
 
         // 6. Update Enemy position and AI
-        val baseSpeedMultiplier = 1f + (gameTimeElapsed / 90f) // enemies speed up over time
-        val speedMultiplier = if (_batterySaverActive.value) baseSpeedMultiplier * 0.5f else baseSpeedMultiplier
+        val baseSpeedMultiplier = 1f + (gameTimeElapsed / 110f) // enemies speed up over time
+        val speedMultiplier = if (_batterySaverActive.value) baseSpeedMultiplier * 0.55f else baseSpeedMultiplier
         val currentEnemies = _enemies.value.map { enemy ->
             val stepX = enemy.x + enemy.vx * speedMultiplier * delta
             val stepY = enemy.y + enemy.vy * speedMultiplier * delta
             
             val (nextVx, nextVy) = when (enemy.type) {
                 EnemyType.CHROME_TAB -> {
-                    if (Random.nextFloat() < 0.015f) {
+                    // Bug fix: Chrome tabs must NOT home in while magnet is active —
+                    // player is stationary collecting and shouldn't be punished for it
+                    if (!isMagnet && Random.nextFloat() < 0.015f) {
                         val dx = px - enemy.x
                         val dy = py - enemy.y
                         val dist = hypot(dx, dy).coerceAtLeast(1f)
@@ -376,7 +387,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     val dx = px - enemy.x
                     val dy = py - enemy.y
                     val dist = hypot(dx, dy).coerceAtLeast(1f)
-                    Pair((dx / dist) * 80f, (dy / dist) * 80f)
+                    // Slow tracking during magnet — player needs a fair window to collect
+                    val trackSpeed = if (isMagnet) 45f else 80f
+                    Pair((dx / dist) * trackSpeed, (dy / dist) * trackSpeed)
                 }
             }
             
@@ -409,7 +422,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         // Spawn Enemies
         if (now - lastEnemySpawnTime >= dynamicSpawnInterval) {
-            val count = if (gameTimeElapsed > 50f) 2 else 1 // double spawn at later stages
+            val count = if (gameTimeElapsed > 65f) 2 else 1 // double spawn at later stages
             repeat(count) {
                 spawnRandomEnemy()
             }
@@ -423,7 +436,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Spawn Power-Ups (Spawned on dynamic rates; e.g. every 12-16 seconds)
-        if (now - lastPowerUpSpawnTime >= 13000L) {
+        if (now - lastPowerUpSpawnTime >= 10000L) {
             spawnPowerUpItem()
             lastPowerUpSpawnTime = now
         }
@@ -574,8 +587,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val updatedParticles = _particles.value.map { part ->
             if (!part.isCollected && hypot(px - part.x, py - part.y) < playerRadius + part.size / 2) {
                 collectedCount++
-                batteryBoost += 10f
-                scoreBoost += 35
+                batteryBoost += 12f
+                scoreBoost += 50
                 
                 val effId = nextEntityId++
                 newVisualEffects.add(
@@ -598,10 +611,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (collectedCount > 0) {
+            val nowMs = System.currentTimeMillis()
+            // Combo: if collected within window, increment multiplier (max 5x)
+            val combo = if (nowMs - lastCollectTime < comboWindowMs) {
+                (_comboMultiplier.value + 1).coerceAtMost(5)
+            } else {
+                1
+            }
+            _comboMultiplier.value = combo
+            lastCollectTime = nowMs
+
             _particlesCollected.value += collectedCount
             _batteryLevel.value = (_batteryLevel.value + batteryBoost).coerceAtLeast(0f).coerceAtMost(100f)
-            _score.value += scoreBoost
+            _score.value += scoreBoost * combo
             _particles.value = updatedParticles
+        } else if (System.currentTimeMillis() - lastCollectTime > comboWindowMs && _comboMultiplier.value > 1) {
+            // Combo expired
+            _comboMultiplier.value = 1
         }
 
         // 2. Collisions with Power-Ups
@@ -655,11 +681,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         // Take damage based on enemy threat level
         val baseDamage = when (enemy.type) {
-            EnemyType.CHROME_TAB -> 12f
+            EnemyType.CHROME_TAB -> 8f
             EnemyType.BACKGROUND_APP -> 18f
             EnemyType.NOTIFICATION -> 10f
             EnemyType.SOFTWARE_UPDATE -> 25f
-            EnemyType.RAM_MONSTER -> 35f
+            EnemyType.RAM_MONSTER -> 28f
         }
 
         // Apply battery saver relief: takes 30% less damage under battery saver Mode
@@ -692,9 +718,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _magnetActive.value = true
                 triggerVisualEffect(_playerX.value, _playerY.value, Color(0xFF7E57C2), "emp_ring", "FAST CHARGING ON")
                 
-                // lasts for 10 seconds
+                // lasts for 12 seconds
                 viewModelScope.launch {
-                    delay(10000L)
+                    delay(12000L)
                     _magnetActive.value = false
                 }
             }

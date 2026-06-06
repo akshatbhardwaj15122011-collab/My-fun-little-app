@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -321,7 +322,7 @@ fun GameMenuScreen(viewModel: GameViewModel) {
             }
 
             Text(
-                text = "OS VERSION 12.0.4 - HEATER STATE: OPTIMAL",
+                text = "⚡ OS v12.0.4  •  THERMAL: OPTIMAL  •  RAM: 69% OCCUPIED",
                 color = Color.Gray.copy(alpha = 0.5f),
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
@@ -340,6 +341,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
     val score by viewModel.score.collectAsStateWithLifecycle()
     val durationSec by viewModel.secondsSurvived.collectAsStateWithLifecycle()
     val particlesCollected by viewModel.particlesCollected.collectAsStateWithLifecycle()
+    val comboMultiplier by viewModel.comboMultiplier.collectAsStateWithLifecycle()
     val shieldsActive by viewModel.shieldCount.collectAsStateWithLifecycle()
     val magnetActive by viewModel.magnetActive.collectAsStateWithLifecycle()
     val batterySaverActive by viewModel.batterySaverActive.collectAsStateWithLifecycle()
@@ -360,7 +362,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
         initialValue = 0f,
         targetValue = 100f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
+            animation = tween(2000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "GridScroll"
@@ -375,6 +377,9 @@ fun GameplayScreen(viewModel: GameViewModel) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                .onSizeChanged { size ->
+                    viewModel.setCanvasSize(size.width.toFloat(), size.height.toFloat())
+                }
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
@@ -384,14 +389,13 @@ fun GameplayScreen(viewModel: GameViewModel) {
         ) {
             val width = size.width
             val height = size.height
-            viewModel.setCanvasSize(width, height)
 
             // Screen shaking calculations
             var shakeX = 0f
             var shakeY = 0f
             if (screenShakeVal > 0f) {
-                shakeX = (Random().nextFloat() * 2f - 1f) * screenShakeVal * 1.5f
-                shakeY = (Random().nextFloat() * 2f - 1f) * screenShakeVal * 1.5f
+                shakeX = (Random.nextFloat() * 2f - 1f) * screenShakeVal * 1.5f
+                shakeY = (Random.nextFloat() * 2f - 1f) * screenShakeVal * 1.5f
             }
 
             // Background Grid Lines
@@ -428,13 +432,13 @@ fun GameplayScreen(viewModel: GameViewModel) {
                 val cx = particle.x + shakeX
                 val cy = particle.y + shakeY
                 
-                val pBreathe = 1f + sin(System.currentTimeMillis() / 150.0).toFloat() * 0.15f
+                val pBreathe = 1f + sin(System.currentTimeMillis() / 100.0).toFloat() * 0.22f
                 val pScaleSize = particle.size * pBreathe
 
                 // Glow ring
                 drawCircle(
-                    color = CyberGreen.copy(alpha = 0.2f),
-                    radius = pScaleSize * 1.6f,
+                    color = CyberGreen.copy(alpha = 0.3f),
+                    radius = pScaleSize * 1.8f,
                     center = Offset(cx, cy)
                 )
                 // Solid core
@@ -461,7 +465,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
                 }
 
                 // Rotating outline ring
-                val rotAngle = (System.currentTimeMillis() / 4L) % 360f
+                val rotAngle = (System.currentTimeMillis() / 3L) % 360f
                 rotate(rotAngle, Offset(pX, pY)) {
                     drawRoundRect(
                         color = color.copy(alpha = 0.35f),
@@ -552,7 +556,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
                     }
                     EnemyType.SOFTWARE_UPDATE -> {
                         // Double heavy loader arrows spinner
-                        val rotAngle = (System.currentTimeMillis() / 6L) % 360f
+                        val rotAngle = (System.currentTimeMillis() / 4L) % 360f
                         rotate(rotAngle, Offset(eX, eY)) {
                             drawArc(
                                 color = enemyColor,
@@ -572,7 +576,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
                         
                         // drawing small satellites circles surrounding crawls
                         repeat(4) { idx ->
-                            val sAngle = (idx * 90f + System.currentTimeMillis() / 12f) % 360f
+                            val sAngle = (idx * 90f + System.currentTimeMillis() / 7f) % 360f
                             val sDist = (eS * 0.6f) + blobBreathe
                             val satX = eX + sin(Math.toRadians(sAngle.toDouble())).toFloat() * sDist
                             val satY = eY + Math.cos(Math.toRadians(sAngle.toDouble())).toFloat() * sDist
@@ -606,12 +610,12 @@ fun GameplayScreen(viewModel: GameViewModel) {
             if (glitchEffectRate > 0f) {
                 drawRect(
                     color = CyberGreen.copy(alpha = glitchEffectRate * 0.12f),
-                    topLeft = Offset(0f, Random().nextFloat() * height),
+                    topLeft = Offset(0f, Random.nextFloat() * height),
                     size = Size(width, 16f)
                 )
                 drawRect(
                     color = CyberPink.copy(alpha = glitchEffectRate * 0.18f),
-                    topLeft = Offset(0f, Random().nextFloat() * height),
+                    topLeft = Offset(0f, Random.nextFloat() * height),
                     size = Size(width, 22f)
                 )
             }
@@ -765,7 +769,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
                 )
             }
 
-            // Character eyes and mouth face (from Vibrant Palette design)
+            // Character eyes and mouth face - reacts to battery level!
             drawCircle(
                 color = Color.Black,
                 radius = 4f,
@@ -776,13 +780,20 @@ fun GameplayScreen(viewModel: GameViewModel) {
                 radius = 4f,
                 center = Offset(plX + 8f, plY - 10f)
             )
-            // Little cute smile
-            val pathSmile = Path().apply {
-                moveTo(plX - 6f, plY + 2f)
-                quadraticTo(plX, plY + 7f, plX + 6f, plY + 2f)
+            // Face reacts: smile when healthy, frown when critical
+            val pathFace = Path().apply {
+                if (batteryLevel <= 20f) {
+                    // Worried frown
+                    moveTo(plX - 6f, plY + 7f)
+                    quadraticTo(plX, plY + 2f, plX + 6f, plY + 7f)
+                } else {
+                    // Happy smile
+                    moveTo(plX - 6f, plY + 2f)
+                    quadraticTo(plX, plY + 7f, plX + 6f, plY + 2f)
+                }
             }
             drawPath(
-                path = pathSmile,
+                path = pathFace,
                 color = Color.Black.copy(alpha = 0.5f),
                 style = Stroke(width = 2.5f)
             )
@@ -828,127 +839,97 @@ fun GameplayScreen(viewModel: GameViewModel) {
             }
         }
 
-        // Overlay Panels Header Card (styled after the top HUD in the Vibrant Palette HTML)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = CyberGray),
-            shape = RoundedCornerShape(24.dp),
+        // Slim transparent top HUD strip — no more blocking the gameplay!
+        val hudBatColor = when {
+            batteryLevel <= 20f -> NeonRed
+            batteryLevel <= 50f -> CyberYellow
+            else -> CyberGreen
+        }
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
                 .statusBarsPadding()
-                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Left: Battery icon + %
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Left element: Dynamic Battery Outline + Text Label (HTML representation)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Tiny inline battery drawing
-                        Box(
-                            modifier = Modifier
-                                .size(width = 44.dp, height = 22.dp)
-                                .border(2.dp, CyberGreen, RoundedCornerShape(4.dp))
-                                .padding(2.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(batteryLevel / 100f)
-                                    .background(CyberGreen)
-                            )
-                        }
-                        Text(
-                            text = "${batteryLevel.toInt()}%",
-                            color = CyberGreen,
-                            fontSize = 16.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Black
-                        )
-                    }
-
-                    // Right element: Survival duration (Uptime in HTML)
-                    Column(
-                        horizontalAlignment = Alignment.End
-                    ) {
-                        Text(
-                            text = "UPTIME SURVIVAL",
-                            color = Color.LightGray.copy(alpha = 0.6f),
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 1.dp)
-                        )
-                        Text(
-                            text = String.format("%02d:%02d", durationSec / 60, durationSec % 60),
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Black
-                        )
-                    }
-                }
-
-                // Horizontal Load line representing CPU Load / Overload
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier
+                        .size(width = 32.dp, height = 16.dp)
+                        .border(1.5.dp, hudBatColor, RoundedCornerShape(3.dp))
+                        .padding(2.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(3.dp))
-                    ) {
-                        val progressFillColor = if (batteryLevel <= 20f) NeonRed else CyberGreen
-                        // Draw progressive load line
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth(batteryLevel / 100f)
-                                .background(progressFillColor, RoundedCornerShape(3.dp))
-                        )
-                    }
-                    Text(
-                        text = "CPU LOAD",
-                        color = Color.Gray,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.ExtraBold
+                            .fillMaxHeight()
+                            .fillMaxWidth(batteryLevel / 100f)
+                            .background(hudBatColor)
                     )
                 }
+                Text(
+                    text = "${batteryLevel.toInt()}%",
+                    color = hudBatColor,
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Black
+                )
+            }
 
-                // Score Display Row from HTML
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            // Center: Score + optional combo badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (comboMultiplier > 1) {
                     Text(
-                        text = "TERMINAL THREAD SCORE",
-                        color = Color.LightGray,
-                        fontSize = 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = String.format("%06d PTS", score),
-                        color = CyberYellow,
-                        fontSize = 13.sp,
+                        text = "x$comboMultiplier",
+                        color = CyberOrange,
+                        fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Black
                     )
                 }
+                Text(
+                    text = String.format("%06d", score),
+                    color = CyberYellow,
+                    fontSize = 14.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Black
+                )
             }
+
+            // Right: Timer
+            Text(
+                text = String.format("%02d:%02d", durationSec / 60, durationSec % 60),
+                color = Color.White,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Black
+            )
+        }
+
+        // Thin battery drain bar just below the top strip
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(top = 52.dp, start = 14.dp, end = 14.dp)
+                .height(3.dp)
+                .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(2.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(batteryLevel / 100f)
+                    .background(hudBatColor, RoundedCornerShape(2.dp))
+            )
         }
 
         // Floating Active Power-ups Bar & Navigation Bar (styled from "Vibrant Palette" HTML mockup)
@@ -1204,6 +1185,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.7f))
+                    .pointerInput(Unit) { detectDragGestures { _, _ -> } } // consume all touch events
                     .padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -1237,7 +1219,7 @@ fun GameplayScreen(viewModel: GameViewModel) {
                             lineHeight = 18.sp
                         )
 
-                        Divider(color = Color.White.copy(alpha = 0.1f))
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
                         Button(
                             onClick = { viewModel.resolvePopup(leftClicked = true) },
@@ -1335,7 +1317,26 @@ fun GameOverScreen(viewModel: GameViewModel) {
                     ResultRow(label = "FINAL SCORE", value = "$finalScore PTS", color = CyberYellow)
                     ResultRow(label = "TIME SURVIVED", value = String.format("%02d:%02d", secondsSurvived / 60, secondsSurvived % 60), color = CyberCyan)
                     ResultRow(label = "POWER COLLECTED", value = "$particlesCollected CORES", color = CyberGreen)
-                    ResultRow(label = "HIGH SCORE RECORD", value = "$highestScore PTS", color = Color.White)
+                    ResultRow(label = "HIGH SCORE RECORD", value = "$highestScore PTS", color = if (finalScore >= highestScore) CyberYellow else Color.White)
+                    if (finalScore >= highestScore && finalScore > 0) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(CyberYellow.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .border(1.dp, CyberYellow.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🏆 NEW RECORD WRITTEN TO MEMORY!",
+                                color = CyberYellow,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Black,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1600,7 +1601,7 @@ fun HelpScreen(viewModel: GameViewModel) {
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    Divider(color = Color.White.copy(alpha = 0.1f))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                 }
 
                 item {
