@@ -40,9 +40,13 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Rename APK
+        run: |
+          mv app/build/outputs/apk/release/app-release.apk "Battery-Survivor-${{ github.ref_name }}.apk"
+
       - name: Attach APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/*.apk
+          files: Battery-Survivor-${{ github.ref_name }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
