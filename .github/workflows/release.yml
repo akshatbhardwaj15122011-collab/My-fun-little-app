@@ -1,9 +1,9 @@
 name: Build and Release APK
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
   build:
@@ -37,7 +37,7 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Create Release
+      - name: Attach APK to Release
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk
